@@ -1,0 +1,409 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>Untitled Document</title>
+<script type="text/javascript" src="js/Three.js"></script>
+<script type="text/javascript" src="js/Cube.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    
+    
+<style type="text/css" media="screen">
+
+html,body {overflow:hidden;}
+
+</style>
+
+</head>
+
+<body>
+<script type="text/javascript">
+
+    var camera, scene, renderer;
+	var cube, plane;
+	var playersObj={};
+	var bulletsObj={};
+	var bulletCount=0;
+	var camTargetX=0,camTargetZ=0;
+	var socket;
+	var isMoving=false;
+	var bulletFired=false;
+	var cRotation=0;
+	var cPosition=0;
+	var current_player_id=Math.round(Math.random()*1000000);
+	var bulletsList={};
+	
+	var lat = 0, lon = 0, phy = 0, theta = 0;
+
+	
+			var mouseX = 0, mouseY = 0;
+
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+			var container, stats;
+
+    init();
+	initSocket();
+	
+    setInterval( loop, 1000 / 24 );
+
+    function init() {
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+        camera = new THREE.Camera( 75, window.innerWidth / window.innerHeight, 1, 10000 );
+        camera.position.z = 400;
+		camera.position.y=50;
+        scene = new THREE.Scene();
+
+		var ycount=0;
+        
+		for (var i = 0; i < 1000; i++) {
+            var particle = new THREE.Particle( new THREE.ParticleCircleMaterial( { color: Math.random() * 0xffffff } ) );
+			if(i%30==0)ycount++;
+            particle.position.x = (i%30)*40-600;
+            particle.position.y = -10;
+            particle.position.z = ycount*20;
+            particle.scale.x = particle.scale.y = .5;
+            scene.addObject( particle );
+        }
+		
+				// Cube
+
+				var materials = [];
+
+				for ( var j = 0; j < 6; j ++ ) {
+
+					materials.push( [ new THREE.MeshBasicMaterial( { color: Math.random() * 0xffffff } ) ] );
+
+				}
+
+				cube = new THREE.Mesh( new Cube( 20, 20, 20, 1, 1, materials ), new THREE.MeshFaceMaterial() );
+				cube.position.y = 0;
+				cube.position.x=Math.random()*1200-600;
+				cube.position.z=Math.random()*1000;
+				cube.overdraw = true;
+				scene.addObject( cube );
+
+
+        renderer = new THREE.CanvasRenderer();
+        renderer.setSize( window.innerWidth, window.innerHeight );
+		container.appendChild( renderer.domElement );
+		document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+		document.addEventListener( 'touchstart', onDocumentTouchStart, false );
+		document.addEventListener( 'touchmove', onDocumentTouchMove, false );
+	    //document.body.appendChild( renderer.domElement );
+		
+		
+		  window.onkeydown = function(e) {
+			  
+			if ( e.keyCode == 38 ) {
+				isMoving=true;
+				cPosition=-8;
+				//up
+            } else if ( e.keyCode == 37) {
+				isMoving=true;
+				cRotation=.125;
+           		//left
+			} else if (e.keyCode == 39) {
+				isMoving=true;
+				cRotation=-.125;
+				//right
+				
+			} else if ( e.keyCode == 40) {
+    				isMoving=true;
+					cPosition=8;
+				//down
+			} else if (e.keyCode == 32) {
+          		//space
+				if(!bulletFired){
+					playerFireBullet();	
+					bulletFired=true;
+				}
+			}
+        }
+
+        window.onkeyup = function(e) {
+		if ( e.keyCode == 38 ) {
+				//up
+				isMoving=false;
+				cPosition=0;
+            } else if ( e.keyCode == 37) {
+           		//left
+				isMoving=false;
+				cRotation=0
+			} else if (e.keyCode == 39) {
+          		//right
+				isMoving=false;
+				cRotation=0
+			} else if ( e.keyCode == 40) {
+           		//down
+				isMoving=false;
+				cPosition=0
+			} else if (e.keyCode == 32) {
+          		//space
+				bulletFired=false;
+			}
+        }
+	    }
+	
+			function moveNewPlayer(id,x,z,rotation)
+			{
+				console.log("move new player "+id);
+				if(playersObj[id]){
+						console.log("new payer is moving ");
+							playersObj[id].cube.rotation.y=rotation;
+							playersObj[id].cube.position.x=x;
+							playersObj[id].cube.position.z=z;
+				}else{
+						createNewPlayer(id,x,z,rotation);
+				}
+				
+			}
+			
+			function createNewPlayer(id,x,z,rotation){
+							var materials = [];
+							for ( var j = 0; j < 6; j ++ ) {
+								materials.push( [ new THREE.MeshBasicMaterial( { color: Math.random() * 0xffffff } ) ] );
+							}
+							var c = new THREE.Mesh( new Cube( 20, 20, 20, 1, 1, materials ), new THREE.MeshFaceMaterial() );
+							c.position.y = 0;
+							c.position.x=x;
+							c.position.z=z;
+							c.rotation.y=rotation;
+							c.overdraw = true;
+							scene.addObject( c);
+							playersObj[id]={cube:c};
+			}
+			
+			function addNewPlayer(players)
+			{
+				console.log("new player added");
+				for(var i in players){
+					var p_id=players[i].id;
+					if(p_id!=current_player_id){
+						if(!playersObj[p_id]){
+							createNewPlayer(p_id,players[i].x,players[i].z,players[i].rotation);
+						}else{
+							playersObj[p_id].cube.position.x=players[i].x;
+							playersObj[p_id].cube.position.z=players[i].z;
+							playersObj[p_id].cube.rotation.y=players[i].rotation;
+						}
+					}
+				}
+			}
+			
+			function initSocket()
+			{
+      				socket = new io.Socket(null, {port: 8080, rememberTransport: false});
+					 //console.log("socket init");
+					 socket.on('message', function(obj){
+						 console.log("client log "+obj.type);
+						 switch(obj.type) {
+							case 'new_player_connected':
+														addNewPlayer(obj.players);
+														break;
+							case 'player_hit':			
+														playerHit(obj.id);
+														break;
+							case 'player_moved':
+	 	 												moveNewPlayer(obj.id,obj.x,obj.z,obj.rotation);
+														break;
+							case 'remove_player':
+														removePlayer(obj.id);
+														break;
+							case 'player_fired':	
+														opponentFireBullet(obj.id,obj.x,obj.z,obj.rotation);
+														break;
+							default: break; 
+						 }
+					 });
+
+					 socket.on('connect', function(obj){
+						connectPlayer(); 
+					  }) 
+ 					 socket.on('disconnect', function(obj){
+						 //disconnectPlayer();
+						var interval;
+						function connect() {
+							if (socket.connected) {
+								clearInterval(interval);
+							} else {
+								socket.connect();
+							}
+						}
+						connect();
+						interval = setInterval(connect, 1000);
+					}) 
+ 				 	socket.connect();
+			}
+			
+			function playerHit(id){
+				
+			};
+			
+			function removePlayer(id){
+				console.log("remove player "+id);
+				if(playersObj[id])scene.removeObject(playersObj[id].cube);
+				delete playersObj[id];
+			}
+			
+
+			
+			function connectPlayer(){
+				console.log("connect player");
+				socket.send({type: 'player_connected', id: current_player_id, x: cube.position.x,z:cube.position.z,rotation:cube.rotation.y});	
+			}
+
+			function disconnectPlayer(){
+				socket.send({type: 'player_disconnected', id: current_player_id});	
+			}
+	
+			function onDocumentMouseMove(event) {
+				mouseX = event.clientX - windowHalfX;
+				mouseY = event.clientY - windowHalfY;
+			}
+
+			function onDocumentTouchStart( event ) {
+				if ( event.touches.length > 1 ) {
+					event.preventDefault();
+					mouseX = event.touches[ 0 ].pageX - windowHalfX;
+					mouseY = event.touches[ 0 ].pageY - windowHalfY;
+				}
+			}
+
+			function onDocumentTouchMove( event ) {
+				if ( event.touches.length == 1 ) {
+					event.preventDefault();
+					mouseX = event.touches[ 0 ].pageX - windowHalfX;
+					mouseY = event.touches[ 0 ].pageY - windowHalfY;
+				}
+			}
+	
+	function opponentFireBullet(id,x,z,rotation){
+		console.log("opponent fire bullet ");
+		if(!playersObj[id])return;
+		
+		bulletCount++;
+		bulletCount%=10000;
+		playersObj[id].cube.position.x=x;
+		playersObj[id].cube.position.z=z;
+		playersObj[id].cube.rotation.y=rotation;
+		var bullet = new Bullet(bulletCount,playersObj[id].cube,id);
+		bulletsObj[bulletCount]=bullet;
+	}
+	
+	function playerFireBullet(){
+		
+			bulletCount++;
+			bulletCount%=10000;
+			var bullet = new Bullet(bulletCount,cube,current_player_id);
+			bulletsObj[bulletCount]=bullet;
+			console.log("fire bullet");
+			
+			socket.send({type: 'player_fired', id: current_player_id, x: cube.position.x,z:cube.position.z,rotation:cube.rotation.y});
+	}
+	
+	function Bullet(id,p,pid){
+		 this.id=id;
+		 this.shooter_id=pid;
+		 this.p=p;
+		 this.range=300;
+		 this.life=15;	 
+		 this.tx=-Math.sin(p.rotation.y)*this.range+p.position.x;
+		 this.tz=-Math.cos(p.rotation.y)*this.range+p.position.z;
+		 this.vx=(this.tx-p.position.x)/this.life;
+		 this.vz=(this.tz-p.position.z)/this.life;
+		 this.dx=0;
+		 this.dz=0;
+		 this.vy=7;
+	 
+	 	 this.particle = new THREE.Particle( new THREE.ParticleCircleMaterial( { color: Math.random() * 0xffffff } ) );
+         this.particle.position.x = p.position.x;
+         this.particle.position.y = p.position.y;
+         this.particle.position.z = p.position.z;
+         this.particle.scale.x = this.particle.scale.y = 4;
+         scene.addObject( this.particle );	
+	}
+	
+	Bullet.prototype.tick=function(){
+		
+		this.dx=(this.tx-this.particle.position.x);
+		this.dz=(this.tz-this.particle.position.z);				
+		this.particle.position.x+=this.vx;
+		this.particle.position.z+=this.vz;
+		this.particle.position.y+=this.vy;
+		this.vy-=1;
+		if(Math.abs(this.dx)<2&&Math.abs(this.dz)<2){
+			if(this.shooter_id==current_player_id){
+				//check if bullet hit anybody
+				for(var i in playersObj){
+					if(Math.abs(this.particle.position.x-playersObj[i].position.x)<10&&Math.abs(this.particle.position.z-playersObj[i].position.z)<10){
+						socket.send({type:'player_hit',id:current_player_id,x:this.particle.position.x,z:this.particle.position.z,tid:playersObj[i].id});	
+						break;
+					}
+				}
+			}
+			scene.removeObject(this.particle);
+			delete bulletsObj[this.id];
+				
+		}
+		console.log("fire bullet tick "+this.particle.position.z);
+	
+	}
+	
+    function loop() {
+				//lon += mouseX * 0.005;
+				//lat -= mouseY * 0.005;
+
+				//lat = Math.max( - 85, Math.min( 85, lat ) );
+				//phi = ( 90 - lat ) * Math.PI / 180;
+				//theta = lon * Math.PI / 180;
+
+				//camera.target.position.x = 100 * Math.sin( phi ) * Math.cos( theta ) + camera.position.x;
+				//camera.target.position.y = 100 * Math.cos( phi ) + camera.position.y;
+				//camera.target.position.z = 100 * Math.sin( phi ) * Math.sin( theta ) + camera.position.z;
+
+				//camera.translateZ(cPosition);
+				//camera.position.x+=cRotation;
+		
+		cube.rotation.y+=cRotation;
+	
+		var cosR=Math.cos(cube.rotation.y);
+		var sinR=Math.sin(cube.rotation.y);
+		cube.position.z+=cosR*cPosition;
+		cube.position.x+=sinR*cPosition;
+		
+		cube.position.z=Math.round(cube.position.z);
+		cube.position.x=Math.round(cube.position.x);
+		cube.rotation.y=Math.round(cube.rotation.y*100)/100;
+	
+		camTargetZ=((cosR*100+cube.position.z)-camera.position.z)*.15;
+		camTargetX=((sinR*100+cube.position.x)-camera.position.x)*.15;
+		
+		camera.position.z+=camTargetZ;
+		camera.position.x+=camTargetX;
+			
+		camera.target.position.x=cube.position.x;
+		camera.target.position.y=cube.position.y;
+		camera.target.position.z=cube.position.z;
+		
+		for(var i in bulletsObj){
+			bulletsObj[i].tick();	
+		}
+        renderer.render( scene, camera );
+		if(isMoving){
+				 socket.send({type: 'player_moved', id: current_player_id, x: cube.position.x,z:cube.position.z,rotation:cube.rotation.y});
+		}
+		
+		
+    }
+	
+	
+	
+	
+
+</script>
+
+</body>
+</html>
