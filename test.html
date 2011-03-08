@@ -173,7 +173,7 @@ html,body {overflow:hidden;}
 							c.rotation.y=rotation;
 							c.overdraw = true;
 							scene.addObject( c);
-							playersObj[id]={cube:c};
+							playersObj[id]={cube:c,id:id};
 			}
 			
 			function addNewPlayer(players)
@@ -239,7 +239,10 @@ html,body {overflow:hidden;}
 			}
 			
 			function playerHit(id){
-				
+				if(id==current_player_id){
+					shakescreen(2);
+					console.log("player is hit "+id);
+				}
 			};
 			
 			function removePlayer(id){
@@ -247,8 +250,6 @@ html,body {overflow:hidden;}
 				if(playersObj[id])scene.removeObject(playersObj[id].cube);
 				delete playersObj[id];
 			}
-			
-
 			
 			function connectPlayer(){
 				console.log("connect player");
@@ -281,7 +282,7 @@ html,body {overflow:hidden;}
 			}
 	
 	function opponentFireBullet(id,x,z,rotation){
-		console.log("opponent fire bullet ");
+		console.log("opponent fire bullet id:"+id+" x:"+x+" z:"+z+" r:"+rotation);
 		if(!playersObj[id])return;
 		
 		bulletCount++;
@@ -327,7 +328,6 @@ html,body {overflow:hidden;}
 	}
 	
 	Bullet.prototype.tick=function(){
-		
 		this.dx=(this.tx-this.particle.position.x);
 		this.dz=(this.tz-this.particle.position.z);				
 		this.particle.position.x+=this.vx;
@@ -338,7 +338,8 @@ html,body {overflow:hidden;}
 			if(this.shooter_id==current_player_id){
 				//check if bullet hit anybody
 				for(var i in playersObj){
-					if(Math.abs(this.particle.position.x-playersObj[i].position.x)<10&&Math.abs(this.particle.position.z-playersObj[i].position.z)<10){
+					if(Math.abs(this.particle.position.x-playersObj[i].cube.position.x)<10&&Math.abs(this.particle.position.z-playersObj[i].cube.position.z)<10){
+						console.log("bullet hit player");
 						socket.send({type:'player_hit',id:current_player_id,x:this.particle.position.x,z:this.particle.position.z,tid:playersObj[i].id});	
 						break;
 					}
@@ -346,10 +347,8 @@ html,body {overflow:hidden;}
 			}
 			scene.removeObject(this.particle);
 			delete bulletsObj[this.id];
-				
 		}
-		console.log("fire bullet tick "+this.particle.position.z);
-	
+		//console.log("fire bullet tick "+this.particle.position.z);
 	}
 	
     function loop() {
@@ -401,6 +400,24 @@ html,body {overflow:hidden;}
 	
 	
 	
+	
+	function shakescreen(n)
+            {
+                if (window.moveBy)
+                {
+                    for (i = 10; i > 0; i--)
+                    {
+                        for (j = n; j > 0; j--)
+                        {
+                            window.moveBy(0, i);
+                            window.moveBy(i, 0);
+                            window.moveBy(0, -i);
+                            window.moveBy(-i, 0);
+                        }
+                    }
+                }
+            }
+
 	
 
 </script>
