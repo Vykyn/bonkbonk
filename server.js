@@ -2,61 +2,75 @@
  * Important note: this application is not suitable for benchmarks!
  */
 
-var http = require('http')
-  , url = require('url')
+var http = require('http'),
+   url = require('url')
+  , path = require('path')
+  , util = require('util')
   , fs = require('fs')
   , io = require('./')
   , sys = require('sys')
   , server;
-    
-server = http.createServer(function(req, res){
-  // your normal server code
-  var path = url.parse(req.url).pathname, content_type;
-  switch (path){
-    case '/':
-      res.writeHead(200, {'Content-Type': 'text/html'});
-      res.write('<a href="test.html">play</a>');
-      res.end();
-      break;
-     
-	case '/js/socket.io-client/socket.io.js':
-	case '/js/Cube.js':  
-	case '/js/Three.js':
-	case '/test.html':
-	
-	      if(path.match(/\.js$/) != null) {
-        content_type = 'text/javascript';
-      } else if(path.match(/\.css$/) != null) {
-        content_type = 'text/css';
-      } else if(path.match(/\.png$/) != null) {
-        content_type = 'image/png';
-      } else {
-        content_type = 'text/html';
-      }
-       
 
-      fs.readFile(__dirname + path, function(err, data){
-        if (err) {
-			 res.writeHead(404);
-  			 res.write(err.toString());
-  			 res.end();
-			 return send404(res);
-		}
-        res.writeHead(200, {'Content-Type': content_type})
-        res.write(data, 'utf8');
-        res.end();
-      });
-      break;
-      
-    default: send404(res);
+function findType(uri) {
+  var types = {
+    '.js': 'text/javascript',
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.ico': 'image/x-icon',
+    '.jpeg': 'image/jpeg',
+    '.jpg': 'image/jpg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml'
+  };
+
+  var ext = uri.match(/\.\w+$/gi);
+  if (ext && ext.length > 0) {
+    ext = ext[0].toLowerCase();
+    if (ext in types) {
+      return types[ext];
+    }
   }
-}),
+  return undefined;
+}
 
-send404 = function(res){
-  res.writeHead(404);
-  res.write('404');
-  res.end();
-};
+function sendError(code, response) {
+  response.writeHead(code);
+  response.end();
+  return;
+}
+
+
+server = http.createServer(function(request, response) {
+  var uri = url.parse(request.url).pathname;
+  if (uri === '/') {uri = '/test.html';}
+  var _file = path.join(process.cwd(), uri);
+
+  path.exists(_file, function(exists) {
+    if (!exists) {
+      sendError(404, response);
+    } else {
+      fs.stat(_file, function(err, stat) {
+        var file = __dirname + uri,
+            type = findType(uri),
+            size = stat.size;
+        if (!type) {
+          sendError(500, response);
+        }
+        response.writeHead(200, {'Content-Type':type, 'Content-Length':size});
+        var rs = fs.createReadStream(file);
+        util.pump(rs, response, function(err) {
+          if (err) {
+            console.log("ReadStream, WriteStream error for util.pump");
+            response.end();
+          }
+        });
+      });
+    }
+  });
+
+});
+
 
 server.listen(8080, '127.0.0.1');
 
@@ -90,7 +104,7 @@ io.on('connection', function(client){
 	  	if(players[message.tid]&&players[message.id]){
 		  	//console.log("player hit "+players[message.tid].x+" x:"+message.x);
 			//console.log("player hit "+players[message.tid].z+" x:"+message.z)
-			if(Math.abs(players[message.tid].x-message.x)<10&&Math.abs(players[message.tid].z-message.z)<10){
+			if(Math.abs(players[message.tid].x-message.x)<20&&Math.abs(players[message.tid].z-message.z)<20){
 					//console.log("player hit hit hit");
 					client.broadcast({type:'player_hit',id:message.id,tid:message.tid});
 				}
