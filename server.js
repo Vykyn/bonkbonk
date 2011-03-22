@@ -7,7 +7,7 @@ var http = require('http'),
   , path = require('path')
   , util = require('util')
   , fs = require('fs')
-  , io = require('./')
+  , io = require('socket.io')
   , sys = require('sys')
   , server;
 

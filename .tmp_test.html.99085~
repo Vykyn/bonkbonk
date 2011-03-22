@@ -3,10 +3,10 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <title>Untitled Document</title>
-<script src="js/Three.js"></script>
-<script src="js/Cube.js"></script>
-<script src="http://cdn.socket.io/stable/socket.io.js"></script>
-<script src="http://code.jquery.com/jquery-1.5.1.min.js"></script>
+<script type="text/javascript" src="js/Three.js"></script>
+<script type="text/javascript" src="js/Cube.js"></script>
+<script type="text/javascript" src="/socket.io/socket.io.js"></script>
+<script type="text/javascript" src="http://code.jquery.com/jquery-1.5.1.min.js"></script>
 
 
     
