@@ -1,10 +1,10 @@
 {
-  "name": "duostack-socket.io-demo",
-  "description": "A demo of Socket.IO use on the Duostack Node.js hosting platform.",
+  "name": "bonkbonk",
+  "description": "A hello world",
   "version": "0.0.1",
-  "homepage": "http://github.com/tfe/duostack-socket.io-demo",
-  "repository": "git://github.com/tfe/duostack-socket.io-demo.git",
-  "author": "Todd Eichel <todd@toddeichel.com> (http://toddeichel.com/)",
+  "homepage": "http://github.com/Vykyn/bonkbonk",
+  "repository": "git://github.com/Vykyn/bonkbonk.git",
+  "author": "Vykyn",
   "directories": {
     "lib": ""
   },
