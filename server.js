@@ -84,7 +84,7 @@ io.on('connection', function(client){
  
   //client.broadcast({ announcement: client.sessionId + ' connected' });
   
-  client.on('message', function(message){
+   client.on('message', function(message){
     var msg = { message: [client.sessionId, message] };
     //console.log(msg);
     switch(message.type) {

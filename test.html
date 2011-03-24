@@ -7,8 +7,7 @@
 <script src="js/Cube.js"></script>
 <script src="http://cdn.socket.io/stable/socket.io.js"></script>
 <script src="http://code.jquery.com/jquery-1.5.1.min.js"></script>
-
-
+    
     
 <style type="text/css" media="screen">
 
@@ -25,7 +24,10 @@ html,body {overflow:hidden;}
 	var cube, plane;
 	var playersObj={};
 	var bulletsObj={};
+	var splatsObj={};
+	var splatCount=0;
 	var bulletCount=0;
+	
 	var camTargetX=0,camTargetZ=0;
 	var socket;
 	var isMoving=false;
@@ -60,7 +62,7 @@ html,body {overflow:hidden;}
 
 		var ycount=0;
         
-		for (var i = 0; i < 900; i++) {
+		for (var i = 0; i < 1000; i++) {
             var particle = new THREE.Particle( new THREE.ParticleCircleMaterial( { color: Math.random() * 0xffffff } ) );
 			if(i%30==0)ycount++;
             particle.position.x = (i%30)*40-600;
@@ -206,7 +208,7 @@ html,body {overflow:hidden;}
 														addNewPlayer(obj.players);
 														break;
 							case 'player_hit':			
-														playerHit(obj.id);
+														playerHit(obj.tid);
 														break;
 							case 'player_moved':
 	 	 												moveNewPlayer(obj.id,obj.x,obj.z,obj.rotation);
@@ -241,10 +243,16 @@ html,body {overflow:hidden;}
 			}
 			
 			function playerHit(id){
+				console.log("player hit id:"+id+" current id:"+current_player_id)
 				if(id==current_player_id){
 					shakescreen(2);
 					console.log("player is hit "+id);
+					splatCount++;
+					splatCount%=10000;
+					var splat = new Splat(splatCount,cube);
+					splatsObj[splatCount]=splat;
 				}
+				
 			};
 			
 			function removePlayer(id){
@@ -342,6 +350,12 @@ html,body {overflow:hidden;}
 				for(var i in playersObj){
 					if(Math.abs(this.particle.position.x-playersObj[i].cube.position.x)<20&&Math.abs(this.particle.position.z-playersObj[i].cube.position.z)<20){
 						console.log("bullet hit player");
+							splatCount++;
+							splatCount%=10000;
+							var splat = new Splat(splatCount,playersObj[i].cube);
+							splatsObj[splatCount]=splat;
+					
+					
 						socket.send({type:'player_hit',id:current_player_id,x:this.particle.position.x,z:this.particle.position.z,tid:playersObj[i].id});	
 						break;
 					}
@@ -352,7 +366,30 @@ html,body {overflow:hidden;}
 		}
 		//console.log("fire bullet tick "+this.particle.position.z);
 	}
-	
+	function Splat(id,p){
+		this.id=id;
+		this.p=p;
+		this.ts=60;
+		 this.ds=0;
+		 this.particle = new THREE.Particle( new THREE.ParticleCircleMaterial( { color: Math.random() * 0xffffff } ) );
+         this.particle.position.x = p.position.x;
+         //this.particle.position.y = p.position.y;
+         this.particle.position.z = p.position.z;
+         this.particle.scale.x = this.particle.scale.y = 4;
+         scene.addObject( this.particle );
+	}
+	Splat.prototype.tick=function(){
+		this.particle.position.x=this.p.position.x;
+		this.particle.position.z=this.p.position.z;
+		
+		this.ds=(this.ts-this.particle.scale.x)*.3
+		this.particle.scale.x+=this.ds;
+		this.particle.scale.y+=this.ds;
+		if(Math.abs(this.ds)<2){
+			scene.removeObject(this.particle);
+			delete splatsObj[this.id];			 
+		}
+	}
     function loop() {
 				//lon += mouseX * 0.005;
 				//lat -= mouseY * 0.005;
@@ -392,6 +429,9 @@ html,body {overflow:hidden;}
 		for(var i in bulletsObj){
 			bulletsObj[i].tick();	
 		}
+		for(var j in splatsObj){
+			splatsObj[j].tick();
+		}
         renderer.render( scene, camera );
 		if(isMoving){
 				 socket.send({type: 'player_moved', id: current_player_id, x: cube.position.x,z:cube.position.z,rotation:cube.rotation.y});
@@ -411,7 +451,7 @@ html,body {overflow:hidden;}
 				 });
 
 
-
+				//alert("player hit")
 
                 if (window.moveBy)
                 {
