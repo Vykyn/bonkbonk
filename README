@@ -1,1 +1,8 @@
-hello world
+A hello world entry into nodejs... a simple third-person-shooter multiplayer prototype. 
+
+Considerations:
+Account for network latency using dead reckoning concept
+Scoring leaderboard
+Social integration
+User Interface
+Customizable player
