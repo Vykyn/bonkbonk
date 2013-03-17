@@ -1,137 +1,81 @@
-/**
- * Important note: this application is not suitable for benchmarks!
- */
-
-var http = require('http'),
-   url = require('url')
-  , path = require('path')
-  , util = require('util')
+var app = require('http').createServer(handler)
+  , io = require('socket.io').listen(app)
   , fs = require('fs')
-  , io = require('socket.io')
-  , sys = require('sys')
-  , server;
 
-function findType(uri) {
-  var types = {
-    '.js': 'text/javascript',
-    '.html': 'text/html',
-    '.css': 'text/css',
-    '.ico': 'image/x-icon',
-    '.jpeg': 'image/jpeg',
-    '.jpg': 'image/jpg',
-    '.png': 'image/png',
-    '.gif': 'image/gif',
-    '.svg': 'image/svg+xml'
-  };
+app.listen(8080);
 
-  var ext = uri.match(/\.\w+$/gi);
-  if (ext && ext.length > 0) {
-    ext = ext[0].toLowerCase();
-    if (ext in types) {
-      return types[ext];
+function handler (req, res) {
+  fs.readFile(__dirname + '/index.html',
+  function (err, data) {
+    if (err) {
+      res.writeHead(500);
+      return res.end('Error loading index.html');
     }
-  }
-  return undefined;
+
+    res.writeHead(200,{'Content-Type': 'text/html'});
+    res.end(data);
+  });
 }
-
-function sendError(code, response) {
-  response.writeHead(code);
-  response.end();
-  return;
-}
+var players={}
+  ,clients_id={}
+  ;
 
 
-server = http.createServer(function(request, response) {
-  var uri = url.parse(request.url).pathname;
-  if (uri === '/') {uri = '/test.html';}
-  var _file = path.join(process.cwd(), uri);
+io.sockets.on('connection', function (client) {
+  
 
-  path.exists(_file, function(exists) {
-    if (!exists) {
-      sendError(404, response);
-    } else {
-      fs.stat(_file, function(err, stat) {
-        var file = __dirname + uri,
-            type = findType(uri),
-            size = stat.size;
-        if (!type) {
-          sendError(500, response);
-        }
-        response.writeHead(200, {'Content-Type':type, 'Content-Length':size});
-        var rs = fs.createReadStream(file);
-        util.pump(rs, response, function(err) {
-          if (err) {
-            console.log("ReadStream, WriteStream error for util.pump");
-            response.end();
-          }
-        });
-      });
-    }
+
+  client.on("heartbeat",function(data){
+      client.broadcast.emit('new_player_connected', {players:players});
   });
 
-});
+  client.on("player_connected",function(data){
+     if(!players[data.id])players[data.id]={id:data.id,x:data.x,z:data.z,rotation:data.rotation};
+        clients_id[client.sessionId] = data.id;
+        client.broadcast.emit('new_player_connected', {players:players});
+  });
 
+  client.on("player_fired",function(data){
+    client.broadcast.emit('player_fired',{id:data.id,x:data.x,z:data.z,rotation:data.rotation});
+  });
 
-server.listen(80, '127.0.0.1');
+  client.on("player_hit",function(data){
+    if(players[data.tid]&&players[data.id]){
+          //console.log("player hit "+players[message.tid].x+" x:"+message.x);
+          //console.log("player hit "+players[message.tid].z+" x:"+message.z)
+          if(Math.abs(players[data.tid].x-data.x)<20&&Math.abs(players[data.tid].z-data.z)<20){
+          //console.log("player hit hit hit");
+              client.broadcast.emit('player_hit',{id:data.id,tid:data.tid});
+            }
+        }
+  });
 
-var io = io.listen(server)
-  , buffer = []
-  , players={}
-  , clients_id={}
-  ;
-  
-io.on('connection', function(client){
- 
-  //client.broadcast({ announcement: client.sessionId + ' connected' });
-  
-   client.on('message', function(message){
-    var msg = { message: [client.sessionId, message] };
-    //console.log(msg);
-    switch(message.type) {
-	  case 'heartbeat':
-	  	client.broadcast({type: 'new_player_connected', players:players});
-	  	break;
-      case 'player_connected':
-	 // console.log("player connected "+message.id);
-	  	if(!players[message.id])players[message.id]={id:message.id,x:message.x,z:message.z,rotation:message.rotation};
-		clients_id[client.sessionId] = message.id;
-		client.broadcast({type: 'new_player_connected', players:players});
-		break;
-	  case 'player_fired':
-	  	client.broadcast({type:'player_fired',id:message.id,x:message.x,z:message.z,rotation:message.rotation});
-		break;
-      case 'player_hit':
-	  	if(players[message.tid]&&players[message.id]){
-		  	//console.log("player hit "+players[message.tid].x+" x:"+message.x);
-			//console.log("player hit "+players[message.tid].z+" x:"+message.z)
-			if(Math.abs(players[message.tid].x-message.x)<20&&Math.abs(players[message.tid].z-message.z)<20){
-					//console.log("player hit hit hit");
-					client.broadcast({type:'player_hit',id:message.id,tid:message.tid});
-				}
-		}
-		break;
-	  case 'player_moved':
-		  //console.log("player moved "+message.id);
-	
-			if(players[message.id]){
-				players[message.id].x=message.x;
-				players[message.id].z=message.z;
-				players[message.id].rotation=message.rotation;		
-			}
-		//client.broadcast({type: 'new_player_connected', players:players});
-
-        client.broadcast({type: "player_moved", id: message.id, x:message.x, z:message.z, rotation:message.rotation});
-        break;
-		
-     
-    }
+  client.on("player_moved",function(data){
+    if(players[data.id]){
+            players[data.id].x=data.x;
+            players[data.id].z=data.z;
+            players[data.id].rotation=data.rotation;
+          }
+          //client.broadcast.emit("server_emit",{type: 'new_player_connected', players:players});
+          client.broadcast.emit("player_moved", {id: data.id, x:data.x, z:data.z, rotation:data.rotation});
   });
 
   client.on('disconnect', function(){
-	 var m_id=clients_id[client.sessionId];
-	 delete players[m_id];
-	 delete clients_id[client.sessionId];
-	 client.broadcast({type: 'remove_player', id:m_id});
-     //client.broadcast({ announcement: client.sessionId + ' disconnected' });
+   var m_id=clients_id[client.sessionId];
+   delete players[m_id];
+   delete clients_id[client.sessionId];
+   client.broadcast.emit('remove_player', {id:m_id});
+     //client.broadcast.emit("server_emit",{ announcement: client.sessionId + ' disconnected' });
   });
+
 });
+
+
+
+
+
+
+
+
+
+
